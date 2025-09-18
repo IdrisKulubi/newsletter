@@ -1,0 +1,1 @@
+// Authentication configuration will be implemented in task 3

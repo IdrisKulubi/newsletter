@@ -1,0 +1,1 @@
+// Global type definitions will be implemented in task 2
