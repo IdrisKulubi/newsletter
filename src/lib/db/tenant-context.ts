@@ -41,3 +41,25 @@ export async function getCurrentTenantId(): Promise<string | null> {
   const tenantId = result[0]?.tenant_id as string;
   return tenantId === '00000000-0000-0000-0000-000000000000' ? null : tenantId;
 }
+
+/**
+ * Get the current tenant context with full tenant information
+ * This is a convenience function that combines tenant ID lookup with tenant data
+ */
+export async function getTenantContext(): Promise<{
+  id: string;
+  userId?: string;
+  name: string;
+} | null> {
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) {
+    return null;
+  }
+
+  // For now, return a basic context
+  // In a full implementation, you might want to fetch tenant details from the database
+  return {
+    id: tenantId,
+    name: 'Current Tenant', // This would be fetched from the database
+  };
+}

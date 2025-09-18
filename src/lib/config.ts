@@ -11,16 +11,17 @@ export const config = {
 
   // Authentication
   auth: {
-    secret: process.env.NEXTAUTH_SECRET!,
-    url: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+    secret: process.env.BETTER_AUTH_SECRET || process.env.NEXTAUTH_SECRET!,
+    url: process.env.BETTER_AUTH_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000',
   },
 
-  // AWS S3
-  aws: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-    region: process.env.AWS_REGION || 'us-east-1',
-    s3Bucket: process.env.AWS_S3_BUCKET!,
+  // Cloudflare R2 Storage (S3-compatible)
+  r2: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    accountId: process.env.R2_ACCOUNT_ID!,
+    bucketName: process.env.R2_BUCKET_NAME!,
+    publicUrl: process.env.R2_PUBLIC_URL, // Optional: for public bucket access
   },
 
   // Redis
@@ -56,17 +57,38 @@ export const config = {
 export function validateConfig() {
   const required = [
     'DATABASE_URL',
-    'NEXTAUTH_SECRET',
-    'AWS_ACCESS_KEY_ID',
-    'AWS_SECRET_ACCESS_KEY',
-    'AWS_S3_BUCKET',
+  ];
+
+  // Check for either BetterAuth or NextAuth secret
+  const hasAuthSecret = process.env.BETTER_AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!hasAuthSecret) {
+    required.push('BETTER_AUTH_SECRET or NEXTAUTH_SECRET');
+  }
+
+  // Optional but recommended for production
+  const optional = [
+    'R2_ACCESS_KEY_ID',
+    'R2_SECRET_ACCESS_KEY', 
+    'R2_ACCOUNT_ID',
+    'R2_BUCKET_NAME',
     'RESEND_API_KEY',
     'OPENAI_API_KEY',
   ];
 
-  const missing = required.filter(key => !process.env[key]);
+  const missing = required.filter(key => {
+    if (key === 'BETTER_AUTH_SECRET or NEXTAUTH_SECRET') {
+      return !hasAuthSecret;
+    }
+    return !process.env[key];
+  });
   
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  // Warn about missing optional variables
+  const missingOptional = optional.filter(key => !process.env[key]);
+  if (missingOptional.length > 0) {
+    console.warn(`Warning: Missing optional environment variables: ${missingOptional.join(', ')}`);
   }
 }
