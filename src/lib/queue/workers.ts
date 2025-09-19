@@ -110,13 +110,13 @@ export const analyticsWorker = new Worker<AnalyticsJobData>(
           // Process daily analytics aggregation
           console.log(`Processing daily aggregation for tenant ${tenantId}`);
 
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          await job.updateProgress(80);
+          await job.updateProgress(20);
 
-          // In real implementation, this would:
-          // - Aggregate daily metrics across all campaigns
-          // - Update dashboard cache
-          // - Generate daily reports
+          // Import analytics service to avoid circular dependencies
+          const { analyticsService } = await import("../services/analytics");
+
+          // Run nightly metrics aggregation
+          await analyticsService.aggregateNightlyMetrics();
 
           await job.updateProgress(100);
 

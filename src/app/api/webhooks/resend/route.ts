@@ -1,155 +1,71 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { emailService } from '@/lib/email';
-import { db } from '@/lib/db';
-import { emailEvents } from '@/lib/db/schema/analytics';
-import { campaigns } from '@/lib/db/schema/campaigns';
-import { eq } from 'drizzle-orm';
+import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { emailService } from "@/lib/email";
+import { analyticsService } from "@/lib/services/analytics";
+import { config } from "@/lib/config";
 
 /**
  * Webhook endpoint for Resend email events
- * Processes delivery, open, click, bounce, and unsubscribe events
+ * Handles delivery, open, click, bounce, unsubscribe, and complaint events
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify webhook signature (if configured)
-    const signature = request.headers.get('resend-signature');
-    const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
+    // Verify webhook signature if configured
+    const headersList = headers();
+    const signature = headersList.get("resend-signature");
     
-    if (webhookSecret && signature) {
-      // TODO: Implement signature verification when Resend supports it
-      // For now, we'll skip verification but log the signature
-      console.log('Webhook signature received:', signature);
+    if (config.email.webhookSecret && signature) {
+      // TODO: Implement signature verification when Resend provides it
+      // For now, we'll rely on the webhook URL being secret
     }
 
     // Parse webhook payload
     const payload = await request.json();
     
+    if (!payload || !payload.type) {
+      return NextResponse.json(
+        { error: "Invalid webhook payload" },
+        { status: 400 }
+      );
+    }
+
     // Process the webhook event
     const emailEvent = await emailService.processWebhook(payload);
     
     if (!emailEvent) {
-      console.warn('Webhook event could not be processed:', payload);
-      return NextResponse.json({ success: false, error: 'Invalid event' }, { status: 400 });
+      // Event was not processable (unknown type, missing data, etc.)
+      return NextResponse.json(
+        { message: "Event ignored" },
+        { status: 200 }
+      );
     }
 
-    // Store the event in database
-    await db.insert(emailEvents).values({
-      id: emailEvent.id,
-      campaignId: emailEvent.campaignId || '',
-      recipientEmail: emailEvent.recipientEmail,
-      eventType: emailEvent.eventType,
-      eventData: emailEvent.eventData,
-      timestamp: emailEvent.timestamp,
-      tenantId: emailEvent.tenantId,
-    });
+    // Record the event in analytics
+    await analyticsService.recordEmailEvent(emailEvent);
 
-    // Update campaign analytics if campaign ID is available
-    if (emailEvent.campaignId) {
-      await updateCampaignAnalytics(emailEvent.campaignId, emailEvent.eventType);
-    }
-
+    // Log successful processing
     console.log(`Processed ${emailEvent.eventType} event for ${emailEvent.recipientEmail}`);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { message: "Event processed successfully" },
+      { status: 200 }
+    );
   } catch (error) {
-    console.error('Webhook processing error:', error);
+    console.error("Webhook processing error:", error);
     
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
 }
 
 /**
- * Update campaign analytics based on email events
+ * Handle GET requests for webhook verification
  */
-async function updateCampaignAnalytics(campaignId: string, eventType: string) {
-  try {
-    // Get current campaign
-    const campaign = await db
-      .select()
-      .from(campaigns)
-      .where(eq(campaigns.id, campaignId))
-      .limit(1);
-
-    if (campaign.length === 0) {
-      console.warn(`Campaign not found: ${campaignId}`);
-      return;
-    }
-
-    const currentCampaign = campaign[0];
-    const analytics = currentCampaign.analytics || {
-      totalSent: 0,
-      delivered: 0,
-      opened: 0,
-      clicked: 0,
-      bounced: 0,
-      unsubscribed: 0,
-      complained: 0,
-      openRate: 0,
-      clickRate: 0,
-      bounceRate: 0,
-      lastUpdated: new Date(),
-    };
-
-    // Increment the appropriate counter
-    switch (eventType) {
-      case 'delivered':
-        analytics.delivered += 1;
-        break;
-      case 'opened':
-        analytics.opened += 1;
-        break;
-      case 'clicked':
-        analytics.clicked += 1;
-        break;
-      case 'bounced':
-        analytics.bounced += 1;
-        break;
-      case 'unsubscribed':
-        analytics.unsubscribed += 1;
-        break;
-      case 'complained':
-        analytics.complained += 1;
-        break;
-    }
-
-    // Recalculate rates
-    const delivered = analytics.delivered || 1; // Avoid division by zero
-    analytics.openRate = (analytics.opened / delivered) * 100;
-    analytics.clickRate = (analytics.clicked / delivered) * 100;
-    analytics.bounceRate = (analytics.bounced / analytics.totalSent) * 100;
-    analytics.lastUpdated = new Date();
-
-    // Update campaign
-    await db
-      .update(campaigns)
-      .set({ 
-        analytics,
-        updatedAt: new Date(),
-      })
-      .where(eq(campaigns.id, campaignId));
-
-    console.log(`Updated analytics for campaign ${campaignId}: ${eventType}`);
-  } catch (error) {
-    console.error(`Failed to update campaign analytics for ${campaignId}:`, error);
-  }
-}
-
-/**
- * Handle GET requests (for webhook verification if needed)
- */
-export async function GET(request: NextRequest) {
-  // Some webhook services require GET endpoint for verification
-  const challenge = request.nextUrl.searchParams.get('challenge');
-  
-  if (challenge) {
-    return NextResponse.json({ challenge });
-  }
-  
-  return NextResponse.json({ status: 'Webhook endpoint active' });
+export async function GET() {
+  return NextResponse.json(
+    { message: "Resend webhook endpoint is active" },
+    { status: 200 }
+  );
 }
