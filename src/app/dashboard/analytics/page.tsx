@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthProvider } from '@/contexts/auth-context';
 import { TenantProvider } from '@/contexts/tenant-context';
+import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
 import { AnalyticsDashboard } from '@/components/analytics/analytics-dashboard';
 import { getDashboardData } from '@/lib/actions/analytics/get-dashboard-data';
 
@@ -22,11 +23,9 @@ export default async function AnalyticsPage() {
   return (
     <AuthProvider initialUser={session.user}>
       <TenantProvider>
-        <div className="min-h-screen bg-background">
-          <div className="container mx-auto py-6">
-            <AnalyticsDashboard initialData={initialData} />
-          </div>
-        </div>
+        <DashboardLayout user={session.user}>
+          <AnalyticsDashboard initialData={initialData} />
+        </DashboardLayout>
       </TenantProvider>
     </AuthProvider>
   );

@@ -4,6 +4,7 @@
  */
 
 import { vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 
 // Mock Redis connection to avoid connection errors in tests
 vi.mock('ioredis', () => {
@@ -51,7 +52,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock environment variables
-process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test';
 process.env.REDIS_URL = 'redis://localhost:6379';
 process.env.OPENAI_API_KEY = 'test-key';

@@ -66,9 +66,15 @@ export class AnalyticsService {
    */
   async recordEmailEvent(event: EmailEvent): Promise<void> {
     try {
+      // Only record events that have a campaignId
+      if (!event.campaignId) {
+        console.warn("Skipping email event without campaignId:", event);
+        return;
+      }
+
       await db.insert(emailEvents).values({
         tenantId: event.tenantId,
-        campaignId: event.campaignId || null,
+        campaignId: event.campaignId,
         recipientEmail: event.recipientEmail,
         eventType: event.eventType,
         eventData: event.eventData,
@@ -76,9 +82,7 @@ export class AnalyticsService {
       });
 
       // Update campaign analytics in real-time for immediate events
-      if (event.campaignId) {
-        await this.updateCampaignAnalytics(event.campaignId, event.eventType);
-      }
+      await this.updateCampaignAnalytics(event.campaignId, event.eventType);
     } catch (error) {
       console.error("Failed to record email event:", error);
       throw error;
@@ -94,27 +98,36 @@ export class AnalyticsService {
     try {
       // Insert all events in a single transaction
       await db.transaction(async (tx) => {
-        // Batch insert events
-        await tx.insert(emailEvents).values(
-          events.map((event) => ({
-            tenantId: event.tenantId,
-            campaignId: event.campaignId || null,
-            recipientEmail: event.recipientEmail,
-            eventType: event.eventType,
-            eventData: event.eventData,
-            timestamp: event.timestamp,
-            
-          }))
-        );
+        // Filter out events without campaignId and batch insert events
+        const validEvents = events.filter((event) => event.campaignId);
+
+        if (validEvents.length > 0) {
+          await tx.insert(emailEvents).values(
+            validEvents.map((event) => ({
+              tenantId: event.tenantId,
+              campaignId: event.campaignId!, // We know it's not null due to filter
+              recipientEmail: event.recipientEmail,
+              eventType: event.eventType,
+              eventData: event.eventData,
+              timestamp: event.timestamp,
+            }))
+          );
+        }
 
         // Update campaign analytics for each unique campaign
-        const campaignIds = [...new Set(events.map(e => e.campaignId).filter(Boolean))];
-        
+        const campaignIds = [
+          ...new Set(validEvents.map((e) => e.campaignId!)),
+        ] as string[];
+
         for (const campaignId of campaignIds) {
-          if (campaignId) {
-            const campaignEvents = events.filter(e => e.campaignId === campaignId);
-            await this.updateCampaignAnalyticsBatch(tx, campaignId, campaignEvents);
-          }
+          const campaignEvents = validEvents.filter(
+            (e) => e.campaignId === campaignId
+          );
+          await this.updateCampaignAnalyticsBatch(
+            tx,
+            campaignId,
+            campaignEvents
+          );
         }
       });
     } catch (error) {
@@ -229,7 +242,8 @@ export class AnalyticsService {
       const totalSent = campaign.analytics?.totalSent || 0;
       const openRate = totalSent > 0 ? (metrics.opened / totalSent) * 100 : 0;
       const clickRate = totalSent > 0 ? (metrics.clicked / totalSent) * 100 : 0;
-      const bounceRate = totalSent > 0 ? (metrics.bounced / totalSent) * 100 : 0;
+      const bounceRate =
+        totalSent > 0 ? (metrics.bounced / totalSent) * 100 : 0;
 
       return {
         campaignId,
@@ -246,11 +260,11 @@ export class AnalyticsService {
         bounceRate: Math.round(bounceRate * 100) / 100,
         uniqueOpens: uniqueOpens[0]?.count || 0,
         uniqueClicks: uniqueClicks[0]?.count || 0,
-        topLinks: topLinks.map(link => ({
-          url: link.url || '',
+        topLinks: topLinks.map((link) => ({
+          url: link.url || "",
           clicks: link.clicks,
         })),
-        timeline: timeline.map(t => ({
+        timeline: timeline.map((t) => ({
           date: t.date,
           opens: t.opens,
           clicks: t.clicks,
@@ -378,22 +392,24 @@ export class AnalyticsService {
       return {
         totalCampaigns: totalCampaigns[0]?.count || 0,
         totalSent: totalSentResult[0]?.total || 0,
-        averageOpenRate: Math.round((averageRates[0]?.avgOpenRate || 0) * 100) / 100,
-        averageClickRate: Math.round((averageRates[0]?.avgClickRate || 0) * 100) / 100,
-        recentCampaigns: recentCampaigns.map(c => ({
+        averageOpenRate:
+          Math.round((averageRates[0]?.avgOpenRate || 0) * 100) / 100,
+        averageClickRate:
+          Math.round((averageRates[0]?.avgClickRate || 0) * 100) / 100,
+        recentCampaigns: recentCampaigns.map((c) => ({
           id: c.id,
           name: c.name,
           sentAt: c.sentAt || new Date(),
           openRate: Math.round((c.openRate || 0) * 100) / 100,
           clickRate: Math.round((c.clickRate || 0) * 100) / 100,
         })),
-        performanceChart: performanceChart.map(p => ({
+        performanceChart: performanceChart.map((p) => ({
           date: p.date,
           sent: p.sent,
           opened: p.opened,
           clicked: p.clicked,
         })),
-        topPerformingCampaigns: topPerformingCampaigns.map(c => ({
+        topPerformingCampaigns: topPerformingCampaigns.map((c) => ({
           id: c.id,
           name: c.name,
           openRate: Math.round((c.openRate || 0) * 100) / 100,
@@ -483,7 +499,11 @@ export class AnalyticsService {
               },
             })
             .onConflictDoUpdate({
-              target: [dailyAnalytics.tenantId, dailyAnalytics.campaignId, dailyAnalytics.date],
+              target: [
+                dailyAnalytics.tenantId,
+                dailyAnalytics.campaignId,
+                dailyAnalytics.date,
+              ],
               set: {
                 metrics: sql`excluded.metrics`,
                 updatedAt: sql`now()`,
@@ -492,7 +512,9 @@ export class AnalyticsService {
         }
       }
 
-      console.log(`Aggregated metrics for ${campaignsWithEvents.length} campaigns`);
+      console.log(
+        `Aggregated metrics for ${campaignsWithEvents.length} campaigns`
+      );
     } catch (error) {
       console.error("Failed to aggregate nightly metrics:", error);
       throw error;
@@ -538,8 +560,10 @@ export class AnalyticsService {
       const totalSent = updatedAnalytics.totalSent;
       if (totalSent > 0) {
         updatedAnalytics.openRate = (updatedAnalytics.opened / totalSent) * 100;
-        updatedAnalytics.clickRate = (updatedAnalytics.clicked / totalSent) * 100;
-        updatedAnalytics.bounceRate = (updatedAnalytics.bounced / totalSent) * 100;
+        updatedAnalytics.clickRate =
+          (updatedAnalytics.clicked / totalSent) * 100;
+        updatedAnalytics.bounceRate =
+          (updatedAnalytics.bounced / totalSent) * 100;
       }
 
       // Update campaign
@@ -603,8 +627,10 @@ export class AnalyticsService {
       const totalSent = updatedAnalytics.totalSent;
       if (totalSent > 0) {
         updatedAnalytics.openRate = (updatedAnalytics.opened / totalSent) * 100;
-        updatedAnalytics.clickRate = (updatedAnalytics.clicked / totalSent) * 100;
-        updatedAnalytics.bounceRate = (updatedAnalytics.bounced / totalSent) * 100;
+        updatedAnalytics.clickRate =
+          (updatedAnalytics.clicked / totalSent) * 100;
+        updatedAnalytics.bounceRate =
+          (updatedAnalytics.bounced / totalSent) * 100;
       }
 
       // Update campaign

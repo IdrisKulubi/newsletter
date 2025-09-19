@@ -5,6 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { NewsletterService } from '@/lib/services/newsletter';
+import { auth } from '@/lib/auth/config';
+import { headers } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { AuthProvider } from '@/contexts/auth-context';
+import { TenantProvider } from '@/contexts/tenant-context';
+import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
 
 async function NewsletterList() {
   const { newsletters, total } = await NewsletterService.list({
@@ -141,19 +147,33 @@ async function NewsletterList() {
   );
 }
 
-export default function NewslettersPage() {
-  return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Newsletters</h1>
-        <p className="text-muted-foreground">
-          Create and manage your newsletter content
-        </p>
-      </div>
+export default async function NewslettersPage() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
 
-      <Suspense fallback={<div>Loading newsletters...</div>}>
-        <NewsletterList />
-      </Suspense>
-    </div>
+  if (!session?.user) {
+    redirect('/auth/signin');
+  }
+
+  return (
+    <AuthProvider initialUser={session.user}>
+      <TenantProvider>
+        <DashboardLayout user={session.user}>
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold">Newsletters</h1>
+              <p className="text-muted-foreground">
+                Create and manage your newsletter content
+              </p>
+            </div>
+
+            <Suspense fallback={<div>Loading newsletters...</div>}>
+              <NewsletterList />
+            </Suspense>
+          </div>
+        </DashboardLayout>
+      </TenantProvider>
+    </AuthProvider>
   );
 }

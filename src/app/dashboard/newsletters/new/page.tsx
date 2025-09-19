@@ -1,15 +1,12 @@
 import { auth } from '@/lib/auth/config';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
-import { UserManagement } from '@/components/auth/user-management';
 import { AuthProvider } from '@/contexts/auth-context';
 import { TenantProvider } from '@/contexts/tenant-context';
 import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
+import { NewsletterEditorPage } from '@/components/newsletter/newsletter-editor-page';
 
-export default async function UsersPage() {
+export default async function NewNewsletterPage() {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -18,29 +15,16 @@ export default async function UsersPage() {
     redirect('/auth/signin');
   }
 
-  // Check if user is admin
-  const currentUser = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, session.user.id))
-    .limit(1);
-
-  if (!currentUser[0] || currentUser[0].role !== 'admin') {
+  // Check if user has editor permissions
+  if (session.user.role === 'viewer') {
     redirect('/dashboard');
   }
-
-  // Get all users in the same tenant
-  const tenantUsers = await db
-    .select()
-    .from(users)
-    .where(eq(users.tenantId, currentUser[0].tenantId!))
-    .orderBy(users.createdAt);
 
   return (
     <AuthProvider initialUser={session.user}>
       <TenantProvider>
         <DashboardLayout user={session.user}>
-          <UserManagement users={tenantUsers} currentUserId={session.user.id} />
+          <NewsletterEditorPage />
         </DashboardLayout>
       </TenantProvider>
     </AuthProvider>
