@@ -112,112 +112,35 @@ export async function sendCampaign(data: SendCampaignData): Promise<SendCampaign
  */
 export async function processCampaignSending(campaignId: string): Promise<void> {
   try {
-    // Get campaign with newsletter and tenant info
-    const campaignData = await db
-      .select({
-        campaign: campaigns,
-        newsletter: newsletters,
-      })
-      .from(campaigns)
-      .innerJoin(newsletters, eq(campaigns.newsletterId, newsletters.id))
-      .where(eq(campaigns.id, campaignId))
-      .limit(1);
+    // Import batch processor to avoid circular dependencies
+    const { batchProcessor } = await import('@/lib/services/batch-processor');
 
-    if (campaignData.length === 0) {
-      throw new Error('Campaign not found');
-    }
+    // Process campaign using batch processor with retry logic
+    const result = await batchProcessor.processCampaignInBatches(campaignId, {
+      batchSize: 100, // Process 100 emails per batch
+      delayBetweenBatches: 1000, // 1 second delay between batches
+      maxRetries: 3, // Retry failed batches up to 3 times
+      retryDelay: 5000, // 5 second delay before retry
+    });
 
-    const { campaign, newsletter } = campaignData[0];
+    console.log(`Campaign ${campaignId} processing completed:`, {
+      totalRecipients: result.totalRecipients,
+      totalBatches: result.totalBatches,
+      successfulBatches: result.successfulBatches,
+      failedBatches: result.failedBatches,
+      totalEmailsSent: result.totalEmailsSent,
+      totalEmailsFailed: result.totalEmailsFailed,
+      processingTimeMs: result.processingTimeMs,
+    });
 
-    // Get subscribers for this tenant
-    const recipientList = await db
-      .select()
-      .from(subscribers)
-      .where(
-        and(
-          eq(subscribers.tenantId, campaign.tenantId),
-          eq(subscribers.status, 'active')
-        )
-      );
-
-    if (recipientList.length === 0) {
-      throw new Error('No active subscribers found');
-    }
-
-    // Prepare email batch
-    const recipients: EmailRecipient[] = recipientList.map(subscriber => ({
-      email: subscriber.email,
-      name: subscriber.firstName && subscriber.lastName 
-        ? `${subscriber.firstName} ${subscriber.lastName}` 
-        : subscriber.firstName || undefined,
-      personalizations: {
-        firstName: subscriber.firstName || '',
-        lastName: subscriber.lastName || '',
-        email: subscriber.email,
-      },
-    }));
-
-    const emailBatch: EmailBatch = {
-      recipients,
-      newsletter,
-      from: `newsletter@${campaign.tenantId}.com`, // Use tenant-based from address
-      replyTo: `support@${campaign.tenantId}.com`, // Use tenant-based reply-to
-      tags: [
-        `tenant:${campaign.tenantId}`,
-        `campaign:${campaign.id}`,
-        `newsletter:${newsletter.id}`,
-      ],
-      headers: {
-        'X-Tenant-ID': campaign.tenantId,
-        'X-Campaign-ID': campaign.id,
-        'X-Newsletter-ID': newsletter.id,
-      },
-    };
-
-    // Send the batch
-    const results = await emailService.sendBatch(emailBatch);
-
-    // Calculate statistics
-    const totalSent = results.length;
-    const successful = results.filter(r => r.status === 'sent').length;
-    const failed = results.filter(r => r.status === 'failed').length;
-
-    // Update campaign with results
-    const analytics = {
-      totalSent,
-      delivered: 0, // Will be updated by webhooks
-      opened: 0,
-      clicked: 0,
-      bounced: 0,
-      unsubscribed: 0,
-      complained: 0,
-      openRate: 0,
-      clickRate: 0,
-      bounceRate: 0,
-      lastUpdated: new Date(),
-    };
-
-    await db
-      .update(campaigns)
-      .set({
-        status: failed === 0 ? 'sent' : 'sent', // Use 'sent' status even if some failed
-        sentAt: new Date(),
-        analytics,
-        updatedAt: new Date(),
-      })
-      .where(eq(campaigns.id, campaignId));
-
-    console.log(`Campaign ${campaignId} sent: ${successful}/${totalSent} successful`);
-
-    // Log failed sends
-    if (failed > 0) {
-      const failedResults = results.filter(r => r.status === 'failed');
-      console.error(`Campaign ${campaignId} failures:`, failedResults);
+    // Log any failures
+    if (result.failedBatches > 0) {
+      console.warn(`Campaign ${campaignId} had ${result.failedBatches} failed batches out of ${result.totalBatches}`);
     }
   } catch (error) {
     console.error(`Failed to process campaign ${campaignId}:`, error);
     
-    // Update campaign status to cancelled (closest available status)
+    // Update campaign status to cancelled on error
     await db
       .update(campaigns)
       .set({
