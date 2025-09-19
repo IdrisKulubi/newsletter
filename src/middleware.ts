@@ -1,17 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
+import { securityMiddleware, getClientIP } from '@/lib/security/headers';
+import { checkRateLimit } from '@/lib/security/rate-limiting';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, method } = request.nextUrl;
   
-  // Skip middleware for static files and API routes that don't need auth
+  // Apply security headers and CSRF protection first
+  const securityResponse = securityMiddleware(request);
+  if (securityResponse.status !== 200) {
+    return securityResponse;
+  }
+  
+  // Skip middleware for static files and certain API routes
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/static') ||
-    pathname.includes('.')
+    pathname.includes('.') ||
+    pathname.startsWith('/favicon')
   ) {
-    return NextResponse.next();
+    return securityResponse;
+  }
+
+  // Rate limiting for API routes and sensitive actions
+  const clientIP = getClientIP(request);
+  
+  if (pathname.startsWith('/api/')) {
+    const rateLimitResult = await checkRateLimit(clientIP, 'API_REQUESTS');
+    
+    if (!rateLimitResult.allowed) {
+      const response = NextResponse.json(
+        { 
+          error: 'Too Many Requests',
+          message: 'Rate limit exceeded',
+          retryAfter: rateLimitResult.retryAfter 
+        },
+        { status: 429 }
+      );
+      
+      // Add rate limit headers
+      response.headers.set('X-RateLimit-Limit', '100');
+      response.headers.set('X-RateLimit-Remaining', rateLimitResult.remaining.toString());
+      response.headers.set('X-RateLimit-Reset', Math.ceil(rateLimitResult.resetTime / 1000).toString());
+      
+      if (rateLimitResult.retryAfter) {
+        response.headers.set('Retry-After', rateLimitResult.retryAfter.toString());
+      }
+      
+      return response;
+    }
   }
 
   // Extract tenant from subdomain or custom domain
@@ -36,8 +74,35 @@ export async function middleware(request: NextRequest) {
     headers: request.headers,
   });
 
-  // Create response with tenant context
+  // Additional rate limiting for authenticated users
+  if (session?.user) {
+    const userRateLimitResult = await checkRateLimit(session.user.id, 'API_REQUESTS');
+    
+    if (!userRateLimitResult.allowed) {
+      const response = NextResponse.json(
+        { 
+          error: 'Too Many Requests',
+          message: 'User rate limit exceeded',
+          retryAfter: userRateLimitResult.retryAfter 
+        },
+        { status: 429 }
+      );
+      
+      if (userRateLimitResult.retryAfter) {
+        response.headers.set('Retry-After', userRateLimitResult.retryAfter.toString());
+      }
+      
+      return response;
+    }
+  }
+
+  // Create response with security headers and tenant context
   const response = NextResponse.next();
+  
+  // Copy security headers from the security middleware response
+  securityResponse.headers.forEach((value, key) => {
+    response.headers.set(key, value);
+  });
   
   // Add tenant context to headers for use in components
   if (tenantId) {
@@ -49,6 +114,9 @@ export async function middleware(request: NextRequest) {
     response.headers.set('x-user-id', session.user.id);
     response.headers.set('x-user-role', session.user.role || 'viewer');
   }
+  
+  // Add client IP for logging and security
+  response.headers.set('x-client-ip', clientIP);
 
   // Protect authenticated routes
   const isAuthRoute = pathname.startsWith('/auth');
