@@ -5,6 +5,7 @@ import { UserMenu } from '@/components/auth/user-menu';
 import { AdminOnly, EditorOnly } from '@/components/auth/role-guard';
 import { AuthProvider } from '@/contexts/auth-context';
 import { TenantProvider } from '@/contexts/tenant-context';
+import { getUserRole } from '@/lib/auth/utils';
 
 export default async function DashboardPage() {
   const session = await auth.api.getSession({
@@ -101,7 +102,9 @@ export default async function DashboardPage() {
                             Viewer Features
                           </dt>
                           <dd className="text-lg font-medium text-gray-900">
-                            View Analytics
+                            <a href="/dashboard/analytics" className="text-blue-600 hover:text-blue-800">
+                              View Analytics
+                            </a>
                           </dd>
                         </dl>
                       </div>
@@ -128,7 +131,9 @@ export default async function DashboardPage() {
                         </div>
                         <div>
                           <dt className="text-sm font-medium text-gray-500">Role</dt>
-                          <dd className="mt-1 text-sm text-gray-900 capitalize">{session.user.role}</dd>
+                          <dd className="mt-1 text-sm text-gray-900 capitalize">
+                            {getUserRole(session.user)}
+                          </dd>
                         </div>
                         <div>
                           <dt className="text-sm font-medium text-gray-500">User ID</dt>

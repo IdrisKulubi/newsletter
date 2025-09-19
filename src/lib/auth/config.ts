@@ -35,6 +35,28 @@ export const auth = betterAuth({
       maxAge: 60 * 60 * 24 * 7, // 7 days
     },
   },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "viewer",
+        required: true,
+      },
+      tenantId: {
+        type: "string",
+        required: false,
+      },
+      isActive: {
+        type: "boolean",
+        defaultValue: true,
+        required: true,
+      },
+      lastLoginAt: {
+        type: "date",
+        required: false,
+      },
+    },
+  },
   advanced: {
     generateId: () => crypto.randomUUID(),
     crossSubDomainCookies: {

@@ -140,24 +140,25 @@ export function useAuth() {
 export function useRole() {
   const { user } = useAuth();
   
-  const hasRole = (role: 'admin' | 'editor' | 'viewer') => {
+  const hasRoleCheck = (role: 'admin' | 'editor' | 'viewer') => {
     if (!user) return false;
     
     const roleHierarchy = { admin: 3, editor: 2, viewer: 1 };
-    const userRoleLevel = roleHierarchy[user.role as keyof typeof roleHierarchy] || 0;
+    const userRole = (user as any).role || 'viewer';
+    const userRoleLevel = roleHierarchy[userRole as keyof typeof roleHierarchy] || 0;
     const requiredRoleLevel = roleHierarchy[role];
     
     return userRoleLevel >= requiredRoleLevel;
   };
 
-  const isAdmin = () => hasRole('admin');
-  const isEditor = () => hasRole('editor');
-  const canEdit = () => hasRole('editor');
-  const canView = () => hasRole('viewer');
+  const isAdmin = () => hasRoleCheck('admin');
+  const isEditor = () => hasRoleCheck('editor');
+  const canEdit = () => hasRoleCheck('editor');
+  const canView = () => hasRoleCheck('viewer');
 
   return {
-    role: user?.role,
-    hasRole,
+    role: (user as any)?.role || 'viewer',
+    hasRole: hasRoleCheck,
     isAdmin,
     isEditor,
     canEdit,
