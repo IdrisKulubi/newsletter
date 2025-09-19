@@ -46,6 +46,7 @@ export interface AIJobData {
   tenantId: string;
   type: 'content-generation' | 'subject-optimization' | 'campaign-insights';
   data: Record<string, any>;
+  campaignId?: string; // For campaign-insights jobs
 }
 
 export type JobData = EmailJobData | AnalyticsJobData | AIJobData;

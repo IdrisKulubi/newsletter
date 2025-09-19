@@ -204,26 +204,25 @@ export const aiWorker = new Worker<AIJobData>(
           };
 
         case "campaign-insights":
-          console.log(`Generating campaign insights`);
+          const campaignId = job.data.campaignId || data.campaignId;
+          console.log(`Generating AI campaign insights for campaign ${campaignId}`);
 
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          await job.updateProgress(70);
+          await job.updateProgress(20);
 
-          // In real implementation, this would analyze campaign data and generate insights
-          const insights = {
-            summary: "Campaign performed well with above-average engagement",
-            recommendations: [
-              "Consider similar content for future campaigns",
-              "Optimal send time appears to be Tuesday morning",
-              "Subject line performed 15% better than average",
-            ],
-            keyMetrics: data.metrics || {},
-          };
+          // Import AI insights service to avoid circular dependencies
+          const { aiInsightsService } = await import("../services/ai-insights");
+
+          // Generate comprehensive AI insights
+          const insights = await aiInsightsService.generateCampaignInsights(
+            campaignId,
+            tenantId
+          );
 
           await job.updateProgress(100);
 
           return {
             type: "campaign-insights",
+            campaignId,
             insights,
             generatedAt: new Date().toISOString(),
           };
