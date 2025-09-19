@@ -1,104 +1,134 @@
-import { NextResponse } from 'next/server';
-import { healthChecker } from '@/lib/monitoring/health-check';
-import { performanceMonitor } from '@/lib/monitoring/performance-monitor';
-import { errorTracker } from '@/lib/monitoring/error-tracker';
-import { securityMonitor } from '@/lib/monitoring/security-monitor';
+/**
+ * Health check endpoint for monitoring and load balancers
+ */
+
+import { NextRequest, NextResponse } from 'next/server';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import IORedis from 'ioredis';
+import { config } from '@/lib/config';
 import { logger } from '@/lib/monitoring/logger';
 
-export async function GET(request: Request) {
-  const timer = performanceMonitor.timer('response_time', 'health_check');
-  const requestId = crypto.randomUUID();
-  
-  try {
-    logger.info('Health check requested', { requestId });
-
-    // Get query parameters
-    const url = new URL(request.url);
-    const detailed = url.searchParams.get('detailed') === 'true';
-    const component = url.searchParams.get('component');
-
-    if (component) {
-      // Check specific component
-      const componentHealth = await healthChecker.runCheck(component);
-      
-      if (!componentHealth) {
-        return NextResponse.json(
-          { error: 'Component not found', available: Array.from(healthChecker['checks'].keys()) },
-          { status: 404 }
-        );
-      }
-
-      timer.end();
-      return NextResponse.json(componentHealth);
-    }
-
-    if (detailed) {
-      // Run comprehensive health check
-      const systemHealth = await healthChecker.runAllChecks();
-      
-      // Add monitoring system status
-      const monitoringStatus = {
-        performanceMonitor: performanceMonitor.healthCheck(),
-        errorTracker: errorTracker.healthCheck(),
-        securityMonitor: await securityMonitor.healthCheck(),
-      };
-
-      // Add performance summary
-      const performanceSummary = performanceMonitor.getSummary();
-      
-      // Add error summary
-      const errorStats = errorTracker.getErrorStats();
-      
-      // Add security summary
-      const securityStats = await securityMonitor.getSecurityStats();
-
-      const response = {
-        ...systemHealth,
-        monitoring: monitoringStatus,
-        performance: performanceSummary,
-        errors: {
-          totalErrors: errorStats.totalErrors,
-          unresolvedErrors: errorStats.unresolvedErrors,
-          errorsByCategory: errorStats.errorsByCategory,
-          errorsBySeverity: errorStats.errorsBySeverity,
-        },
-        security: {
-          totalEvents: securityStats.totalEvents,
-          activeAlerts: securityStats.activeAlerts,
-          eventsByType: securityStats.eventsByType,
-          eventsBySeverity: securityStats.eventsBySeverity,
-        },
-      };
-
-      timer.end();
-      return NextResponse.json(response);
-    }
-
-    // Basic health check
-    const basicHealth = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      version: process.env.npm_package_version || '1.0.0',
-      uptime: healthChecker.getUptime(),
-      environment: process.env.NODE_ENV || 'development',
+interface HealthCheck {
+  status: 'healthy' | 'unhealthy';
+  timestamp: string;
+  version: string;
+  environment: string;
+  checks: {
+    database: {
+      status: 'healthy' | 'unhealthy';
+      latency?: number;
+      error?: string;
     };
+    redis: {
+      status: 'healthy' | 'unhealthy';
+      latency?: number;
+      error?: string;
+    };
+    storage: {
+      status: 'healthy' | 'unhealthy';
+      error?: string;
+    };
+  };
+  uptime: number;
+}
 
-    timer.end();
-    return NextResponse.json(basicHealth);
+const startTime = Date.now();
 
+export async function GET(request: NextRequest) {
+  const start = Date.now();
+  
+  const healthCheck: HealthCheck = {
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || '1.0.0',
+    environment: config.app.nodeEnv,
+    checks: {
+      database: { status: 'unhealthy' },
+      redis: { status: 'unhealthy' },
+      storage: { status: 'unhealthy' },
+    },
+    uptime: Date.now() - startTime,
+  };
+
+  // Check database connection
+  try {
+    const dbStart = Date.now();
+    const connection = postgres(config.database.url, {
+      max: 1,
+      ssl: config.database.ssl ? 'require' : false,
+    });
+    
+    const db = drizzle(connection);
+    await db.execute('SELECT 1');
+    await connection.end();
+    
+    healthCheck.checks.database = {
+      status: 'healthy',
+      latency: Date.now() - dbStart,
+    };
   } catch (error) {
-    timer.end();
-    
-    logger.error('Health check failed', error as Error, { requestId });
-    
-    return NextResponse.json(
-      {
-        status: 'unhealthy',
-        timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-        requestId,
-      },
-      { status: 503 }
-    );
+    healthCheck.checks.database = {
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown database error',
+    };
+    healthCheck.status = 'unhealthy';
   }
+
+  // Check Redis connection
+  try {
+    const redisStart = Date.now();
+    const redis = new IORedis(config.redis.url, {
+      password: config.redis.password,
+      tls: config.redis.tls,
+      connectTimeout: 5000,
+      lazyConnect: true,
+    });
+    
+    await redis.ping();
+    await redis.quit();
+    
+    healthCheck.checks.redis = {
+      status: 'healthy',
+      latency: Date.now() - redisStart,
+    };
+  } catch (error) {
+    healthCheck.checks.redis = {
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown Redis error',
+    };
+    healthCheck.status = 'unhealthy';
+  }
+
+  // Check storage (simplified check)
+  try {
+    // For now, just check if credentials are configured
+    if (config.r2.accessKeyId && config.r2.secretAccessKey && config.r2.bucketName) {
+      healthCheck.checks.storage = {
+        status: 'healthy',
+      };
+    } else {
+      throw new Error('Storage credentials not configured');
+    }
+  } catch (error) {
+    healthCheck.checks.storage = {
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown storage error',
+    };
+    healthCheck.status = 'unhealthy';
+  }
+
+  // Log health check
+  const duration = Date.now() - start;
+  logger.info('Health Check', {
+    type: 'health_check',
+    status: healthCheck.status,
+    duration,
+    checks: healthCheck.checks,
+  });
+
+  // Return appropriate status code
+  const statusCode = healthCheck.status === 'healthy' ? 200 : 503;
+  
+  return NextResponse.json(healthCheck, { status: statusCode });
 }

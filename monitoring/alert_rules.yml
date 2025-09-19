@@ -1,0 +1,128 @@
+# Prometheus alerting rules for the newsletter platform
+
+groups:
+  - name: newsletter_alerts
+    rules:
+      # Application health alerts
+      - alert: ApplicationDown
+        expr: up{job="newsletter-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Newsletter application is down"
+          description: "The newsletter application has been down for more than 1 minute."
+
+      - alert: HighErrorRate
+        expr: rate(errors[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second over the last 5 minutes."
+
+      # Performance alerts
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, rate(api_latency_bucket[5m])) > 2000
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency"
+          description: "95th percentile API latency is {{ $value }}ms over the last 5 minutes."
+
+      - alert: DatabaseSlowQueries
+        expr: histogram_quantile(0.95, rate(database_query_time_bucket[5m])) > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile database query time is {{ $value }}ms."
+
+      # Infrastructure alerts
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "The PostgreSQL database has been unreachable for more than 30 seconds."
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been unreachable for more than 30 seconds."
+
+      # Business logic alerts
+      - alert: HighEmailFailureRate
+        expr: rate(emails_sent[5m]) > 0 and (rate(emails_delivered[5m]) / rate(emails_sent[5m])) < 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High email failure rate"
+          description: "Email delivery rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: QueueBacklog
+        expr: queue_size > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Large queue backlog"
+          description: "Queue {{ $labels.queue_name }} has {{ $value }} pending jobs."
+
+      # Resource alerts
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}."
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.instance }}."
+
+  - name: security_alerts
+    rules:
+      - alert: HighRateLimitHits
+        expr: rate(rate_limit_hits[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High rate limit hits"
+          description: "Rate limit is being hit {{ $value }} times per second for endpoint {{ $labels.endpoint }}."
+
+      - alert: SuspiciousActivity
+        expr: rate(security_event{severity="high"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "High severity security event"
+          description: "High severity security event detected: {{ $labels.event }}."
