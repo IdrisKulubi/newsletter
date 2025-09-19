@@ -6,3 +6,4 @@ export * from './newsletters';
 export * from './campaigns';
 export * from './analytics';
 export * from './assets';
+export * from './subscribers';
