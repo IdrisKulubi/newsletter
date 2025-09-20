@@ -16,9 +16,10 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/lib/db/seed.ts",
-    "deploy:production": "tsx scripts/migrate-production.ts && tsx scripts/seed-production.ts",
-    "worker": "tsx scripts/worker.ts",
-    "worker:health": "tsx scripts/worker-health-check.ts"
+    "postbuild": "echo 'Build completed successfully'",
+    "vercel-build": "pnpm db:push && pnpm build",
+    "deploy:production": "vercel --prod",
+    "deploy:preview": "vercel"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.32",

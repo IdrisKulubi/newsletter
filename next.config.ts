@@ -1,9 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Docker
-  output: "standalone",
-
   images: {
     remotePatterns: [
       {
@@ -18,13 +15,15 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "*.cloudflare.com",
       },
+      {
+        protocol: "https",
+        hostname: "*.r2.cloudflarestorage.com",
+      },
     ],
     formats: ["image/webp", "image/avif"],
     minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
-  },
+  
   // Security headers (additional layer beyond middleware)
   async headers() {
     return [
@@ -51,14 +50,20 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // Optimize for performance
+  
+  // Optimize for Vercel deployment
   experimental: {
     optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
   },
-  // Compress responses
+  
+  // Enable compression (handled by Vercel)
   compress: true,
+  
   // Enable SWC minification
   swcMinify: true,
+  
+  // Optimize for serverless functions
+  serverExternalPackages: ["postgres", "ioredis"],
 };
 
 export default nextConfig;
