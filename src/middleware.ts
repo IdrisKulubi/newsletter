@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/config';
 import { securityMiddleware, getClientIP } from '@/lib/security/headers';
-import { checkRateLimit } from '@/lib/security/rate-limiting';
 
 export async function middleware(request: NextRequest) {
   const { pathname, method } = request.nextUrl;
@@ -23,11 +22,12 @@ export async function middleware(request: NextRequest) {
     return securityResponse;
   }
 
-  // Rate limiting for API routes and sensitive actions
+  // Get client IP for logging and security
   const clientIP = getClientIP(request);
   
+  // Simple in-memory rate limiting for middleware (Edge Runtime compatible)
   if (pathname.startsWith('/api/')) {
-    const rateLimitResult = await checkRateLimit(clientIP, 'API_REQUESTS');
+    const rateLimitResult = simpleRateLimit(clientIP);
     
     if (!rateLimitResult.allowed) {
       const response = NextResponse.json(
@@ -74,9 +74,9 @@ export async function middleware(request: NextRequest) {
     headers: request.headers,
   });
 
-  // Additional rate limiting for authenticated users
+  // Additional rate limiting for authenticated users (simple in-memory)
   if (session?.user) {
-    const userRateLimitResult = await checkRateLimit(session.user.id, 'API_REQUESTS');
+    const userRateLimitResult = simpleRateLimit(session.user.id);
     
     if (!userRateLimitResult.allowed) {
       const response = NextResponse.json(
@@ -181,6 +181,43 @@ async function resolveTenantFromDomain(domain: string): Promise<string | null> {
     console.error('Error resolving tenant:', error);
     return null;
   }
+}
+
+// Simple in-memory rate limiting for Edge Runtime compatibility
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+function simpleRateLimit(identifier: string): { allowed: boolean; remaining: number; resetTime: number; retryAfter?: number } {
+  const now = Date.now();
+  const windowMs = 60 * 1000; // 1 minute
+  const maxRequests = 100;
+  
+  const key = identifier;
+  const current = rateLimitMap.get(key);
+  
+  // Clean up expired entries
+  if (current && now > current.resetTime) {
+    rateLimitMap.delete(key);
+  }
+  
+  const entry = rateLimitMap.get(key) || { count: 0, resetTime: now + windowMs };
+  
+  if (entry.count >= maxRequests) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetTime: entry.resetTime,
+      retryAfter: Math.ceil((entry.resetTime - now) / 1000),
+    };
+  }
+  
+  entry.count++;
+  rateLimitMap.set(key, entry);
+  
+  return {
+    allowed: true,
+    remaining: maxRequests - entry.count,
+    resetTime: entry.resetTime,
+  };
 }
 
 export const config = {

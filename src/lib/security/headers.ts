@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import crypto from 'crypto';
 
 /**
  * Security headers configuration
@@ -104,10 +103,12 @@ export class CSRFProtection {
   };
   
   /**
-   * Generate a new CSRF token
+   * Generate a new CSRF token using Web Crypto API
    */
   static generateToken(): string {
-    return crypto.randomBytes(this.TOKEN_LENGTH).toString('hex');
+    const array = new Uint8Array(this.TOKEN_LENGTH);
+    crypto.getRandomValues(array);
+    return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   }
   
   /**
@@ -153,7 +154,12 @@ export class CSRFProtection {
   /**
    * Constant-time string comparison to prevent timing attacks
    */
-  private static constantTimeCompare(a: string, b: string): boolean {
+  private static constantTimeCompare(a: string | null, b: string | null): boolean {
+    // Handle null/undefined cases
+    if (!a || !b) {
+      return false;
+    }
+    
     if (a.length !== b.length) {
       return false;
     }
@@ -330,7 +336,7 @@ export function getClientIP(request: NextRequest): string {
 export async function getCSRFToken(): Promise<string | null> {
   try {
     const headersList = await headers();
-    return headersList.get(CSRFProtection['HEADER_NAME']) || null;
+    return headersList.get('x-csrf-token') || null;
   } catch {
     return null;
   }
@@ -343,7 +349,7 @@ export async function validateCSRFToken(): Promise<boolean> {
   try {
     const headersList = await headers();
     const cookieHeader = headersList.get('cookie');
-    const csrfHeader = headersList.get(CSRFProtection['HEADER_NAME']);
+    const csrfHeader = headersList.get('x-csrf-token');
     
     if (!cookieHeader || !csrfHeader) {
       return false;
@@ -352,19 +358,42 @@ export async function validateCSRFToken(): Promise<boolean> {
     // Parse CSRF token from cookies
     const cookies = cookieHeader.split(';').reduce((acc, cookie) => {
       const [key, value] = cookie.trim().split('=');
-      acc[key] = value;
+      if (key && value) {
+        acc[key] = value;
+      }
       return acc;
     }, {} as Record<string, string>);
     
-    const cookieToken = cookies[CSRFProtection['COOKIE_NAME']];
+    const cookieToken = cookies['csrf-token'];
     
     if (!cookieToken) {
       return false;
     }
     
-    // Use constant-time comparison
-    return CSRFProtection['constantTimeCompare'](cookieToken, csrfHeader);
+    // Use constant-time comparison - create a helper function since we can't access private method
+    return constantTimeCompare(cookieToken, csrfHeader);
   } catch {
     return false;
   }
+}
+
+/**
+ * Helper function for constant-time string comparison
+ */
+function constantTimeCompare(a: string | null, b: string | null): boolean {
+  // Handle null/undefined cases
+  if (!a || !b) {
+    return false;
+  }
+  
+  if (a.length !== b.length) {
+    return false;
+  }
+  
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  
+  return result === 0;
 }

@@ -2,23 +2,25 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker
-  output: 'standalone',
-  
+  output: "standalone",
+
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '*.amazonaws.com',
+        protocol: "https",
+        hostname: "*.amazonaws.com",
       },
       {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
+        protocol: "https",
+        hostname: "images.unsplash.com",
       },
       {
-        protocol: 'https',
-        hostname: '*.cloudflare.com',
+        protocol: "https",
+        hostname: "*.cloudflare.com",
       },
     ],
+    formats: ["image/webp", "image/avif"],
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
   },
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,
@@ -27,23 +29,23 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: '/(.*)',
+        source: "/(.*)",
         headers: [
           {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on'
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
           },
           {
-            key: 'X-Frame-Options',
-            value: 'DENY'
+            key: "X-Frame-Options",
+            value: "DENY",
           },
           {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
+            key: "X-Content-Type-Options",
+            value: "nosniff",
           },
           {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin'
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
           },
         ],
       },
@@ -51,18 +53,12 @@ const nextConfig: NextConfig = {
   },
   // Optimize for performance
   experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    optimizePackageImports: ["lucide-react", "@radix-ui/react-icons"],
   },
   // Compress responses
   compress: true,
   // Enable SWC minification
   swcMinify: true,
-  // Optimize images
-  images: {
-    ...nextConfig.images,
-    formats: ['image/webp', 'image/avif'],
-    minimumCacheTTL: 60 * 60 * 24 * 30, // 30 days
-  },
 };
 
 export default nextConfig;
