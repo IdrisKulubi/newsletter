@@ -97,27 +97,31 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Create response with security headers and tenant context
-  const response = NextResponse.next();
+  // Prepare request headers to forward context to API routes
+  const requestHeaders = new Headers(request.headers);
+
+  if (tenantId) {
+    requestHeaders.set('x-tenant-id', tenantId);
+  }
+
+  if (session?.user) {
+    requestHeaders.set('x-user-id', session.user.id);
+    requestHeaders.set('x-user-role', session.user.role || 'viewer');
+  }
+
+  requestHeaders.set('x-client-ip', clientIP);
+
+  // Create response and forward modified request headers
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
   
   // Copy security headers from the security middleware response
   securityResponse.headers.forEach((value, key) => {
     response.headers.set(key, value);
   });
-  
-  // Add tenant context to headers for use in components
-  if (tenantId) {
-    response.headers.set('x-tenant-id', tenantId);
-  }
-  
-  // Add session context
-  if (session?.user) {
-    response.headers.set('x-user-id', session.user.id);
-    response.headers.set('x-user-role', session.user.role || 'viewer');
-  }
-  
-  // Add client IP for logging and security
-  response.headers.set('x-client-ip', clientIP);
 
   // Protect authenticated routes (but not auth routes since we skip them above)
   const isProtectedRoute = pathname !== '/';
@@ -216,6 +220,7 @@ function simpleRateLimit(identifier: string): { allowed: boolean; remaining: num
 }
 
 export const config = {
+  runtime: 'nodejs',
   matcher: [
     /*
      * Match all request paths except for the ones starting with:

@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { signInAction, signInWithGoogleAction, signInWithMicrosoftAction } from '@/lib/actions/auth/signin';
+import { signInAction } from '@/lib/actions/auth/signin';
+import { signIn } from '@/lib/auth/client';
 import { useFormStatus } from 'react-dom';
 
 function SubmitButton() {
@@ -19,32 +20,46 @@ function SubmitButton() {
   );
 }
 
-function SocialButton({ provider, action, children }: { 
-  provider: string; 
-  action: () => Promise<any>; 
-  children: React.ReactNode; 
-}) {
+function GoogleSignInButton() {
   const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const handleClick = async () => {
+  const handleGoogleSignIn = async () => {
     setIsPending(true);
+    setError(null);
+    
     try {
-      await action();
-    } finally {
-      setIsPending(false);
+      // Preferred: use BetterAuth client to initiate social sign-in
+      await signIn.social({ provider: 'google', callbackURL: '/dashboard' });
+    } catch (err) {
+      // Fallback: use server endpoint to initiate OAuth if client call fails
+      try {
+        window.location.assign('/api/auth/google?callbackURL=/dashboard');
+      } catch (err2) {
+        console.error('Google sign in error:', err2);
+        setError('Failed to sign in with Google. Please try again.');
+        setIsPending(false);
+      }
     }
   };
   
   return (
-    <Button 
-      type="button" 
-      variant="outline" 
-      className="w-full" 
-      onClick={handleClick}
-      disabled={isPending}
-    >
-      {isPending ? `Connecting to ${provider}...` : children}
-    </Button>
+    <>
+      {error && (
+        <Alert variant="destructive" className="mb-2">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      <Button 
+        type="button" 
+        variant="outline" 
+        className="w-full" 
+        onClick={handleGoogleSignIn}
+        disabled={isPending}
+      >
+        {isPending ? 'Connecting to Google...' : 'Continue with Google'}
+      </Button>
+    </>
   );
 }
 
@@ -112,12 +127,7 @@ export function SignInForm() {
         </div>
         
         <div className="space-y-2">
-          <SocialButton provider="Google" action={signInWithGoogleAction}>
-            Continue with Google
-          </SocialButton>
-          <SocialButton provider="Microsoft" action={signInWithMicrosoftAction}>
-            Continue with Microsoft
-          </SocialButton>
+          <GoogleSignInButton />
         </div>
       </CardContent>
     </Card>

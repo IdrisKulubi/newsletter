@@ -53,7 +53,7 @@ export const accounts = pgTable('accounts', {
 export const sessions = pgTable('sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
-  sessionToken: text('session_token').notNull().unique(),
+  token: text('token').notNull().unique(),
   expiresAt: timestamp('expires_at').notNull(),
   ipAddress: text('ip_address'),
   userAgent: text('user_agent'),
@@ -61,7 +61,7 @@ export const sessions = pgTable('sessions', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   userIdIdx: index('sessions_user_id_idx').on(table.userId),
-  sessionTokenIdx: index('sessions_session_token_idx').on(table.sessionToken),
+  tokenIdx: index('sessions_token_idx').on(table.token),
   expiresAtIdx: index('sessions_expires_at_idx').on(table.expiresAt),
 }));
 

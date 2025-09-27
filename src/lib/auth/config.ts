@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
 import { db } from "@/lib/db";
 import { users, accounts, sessions, verification } from "@/lib/db/schema";
 
@@ -18,16 +19,11 @@ export const auth = betterAuth({
     requireEmailVerification: false,
     autoSignIn: true, // Automatically sign in after successful signup
   },
+  // Only Google OAuth is enabled
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      enabled: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-    },
-    microsoft: {
-      clientId: process.env.MICROSOFT_CLIENT_ID || "",
-      clientSecret: process.env.MICROSOFT_CLIENT_SECRET || "",
-      enabled: !!(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET),
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
   session: {
@@ -62,14 +58,19 @@ export const auth = betterAuth({
     database: {
       generateId: () => crypto.randomUUID(),
     },
-    crossSubDomainCookies: {
-      enabled: true,
-      domain: process.env.NODE_ENV === "production" ? ".newsletter.com" : "localhost",
-    },
   },
-  secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-for-development",
+  cookies: {
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  },
+  secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
-  trustedOrigins: ["http://localhost:3000"],
+  trustedOrigins: [
+    process.env.BETTER_AUTH_URL || "http://localhost:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+  ],
+  plugins: [nextCookies()],
 });
 
 export type Session = typeof auth.$Infer.Session;

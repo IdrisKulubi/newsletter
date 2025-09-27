@@ -84,27 +84,3 @@ export async function signInWithGoogleAction() {
     };
   }
 }
-
-export async function signInWithMicrosoftAction() {
-  try {
-    const result = await auth.api.signInSocial({
-      body: {
-        provider: 'microsoft',
-        callbackURL: '/dashboard',
-      },
-      headers: await headers(),
-    });
-
-    if (result.data?.url) {
-      redirect(result.data.url);
-    }
-
-    return {
-      error: 'Failed to initiate Microsoft sign in',
-    };
-  } catch (error) {
-    return {
-      error: 'An unexpected error occurred',
-    };
-  }
-}
