@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 const signInSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export async function signInAction(formData: FormData) {
@@ -25,18 +25,26 @@ export async function signInAction(formData: FormData) {
     });
 
     if (result.error) {
+      console.error('Signin error:', result.error);
       return {
-        error: result.error.message || 'Sign in failed',
+        error: result.error.message || 'Invalid email or password',
       };
     }
 
     // Successful sign in - redirect to dashboard
     redirect('/dashboard');
   } catch (error) {
+    console.error('Signin action error:', error);
+    
     if (error instanceof z.ZodError) {
       return {
         error: error.errors[0]?.message || 'Invalid input',
       };
+    }
+
+    // Handle redirect errors (these are expected)
+    if (error && typeof error === 'object' && 'digest' in error) {
+      throw error;
     }
 
     return {
@@ -59,10 +67,18 @@ export async function signInWithGoogleAction() {
       redirect(result.data.url);
     }
 
+    console.error('Google signin failed:', result.error);
     return {
       error: 'Failed to initiate Google sign in',
     };
   } catch (error) {
+    console.error('Google signin action error:', error);
+    
+    // Handle redirect errors (these are expected)
+    if (error && typeof error === 'object' && 'digest' in error) {
+      throw error;
+    }
+    
     return {
       error: 'An unexpected error occurred',
     };

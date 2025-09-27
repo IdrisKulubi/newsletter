@@ -65,16 +65,17 @@ export const sessions = pgTable('sessions', {
   expiresAtIdx: index('sessions_expires_at_idx').on(table.expiresAt),
 }));
 
-export const verificationTokens = pgTable('verification_tokens', {
+export const verification = pgTable('verification', {
   id: uuid('id').primaryKey().defaultRandom(),
   identifier: text('identifier').notNull(),
-  token: text('token').notNull().unique(),
+  value: text('value').notNull(),
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
-  identifierIdx: index('verification_tokens_identifier_idx').on(table.identifier),
-  tokenIdx: index('verification_tokens_token_idx').on(table.token),
-  expiresAtIdx: index('verification_tokens_expires_at_idx').on(table.expiresAt),
+  identifierIdx: index('verification_identifier_idx').on(table.identifier),
+  valueIdx: index('verification_value_idx').on(table.value),
+  expiresAtIdx: index('verification_expires_at_idx').on(table.expiresAt),
 }));
 
 // Relations for BetterAuth tables
@@ -107,5 +108,5 @@ export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
-export type VerificationToken = typeof verificationTokens.$inferSelect;
-export type NewVerificationToken = typeof verificationTokens.$inferInsert;
+export type Verification = typeof verification.$inferSelect;
+export type NewVerification = typeof verification.$inferInsert;

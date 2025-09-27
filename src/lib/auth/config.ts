@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/lib/db";
-import { users, accounts, sessions, verificationTokens } from "@/lib/db/schema";
+import { users, accounts, sessions, verification } from "@/lib/db/schema";
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -10,12 +10,13 @@ export const auth = betterAuth({
       user: users,
       account: accounts,
       session: sessions,
-      verification: verificationTokens,
+      verification: verification,
     },
   }),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false, // Disable for development
+    requireEmailVerification: false,
+    autoSignIn: true, // Automatically sign in after successful signup
   },
   socialProviders: {
     google: {
@@ -58,7 +59,9 @@ export const auth = betterAuth({
     },
   },
   advanced: {
-    generateId: () => crypto.randomUUID(),
+    database: {
+      generateId: () => crypto.randomUUID(),
+    },
     crossSubDomainCookies: {
       enabled: true,
       domain: process.env.NODE_ENV === "production" ? ".newsletter.com" : "localhost",
@@ -66,7 +69,8 @@ export const auth = betterAuth({
   },
   secret: process.env.BETTER_AUTH_SECRET || "fallback-secret-for-development",
   baseURL: process.env.BETTER_AUTH_URL || "http://localhost:3000",
+  trustedOrigins: ["http://localhost:3000"],
 });
 
 export type Session = typeof auth.$Infer.Session;
-export type User = typeof auth.$Infer.User;
+export type User = typeof auth.$Infer.Session.user;

@@ -27,18 +27,26 @@ export async function signUpAction(formData: FormData) {
     });
 
     if (result.error) {
+      console.error('Signup error:', result.error);
       return {
         error: result.error.message || 'Sign up failed',
       };
     }
 
-    // Successful sign up - redirect to email verification page
-    redirect('/auth/verify-email');
+    // Since email verification is disabled, redirect directly to dashboard
+    redirect('/dashboard');
   } catch (error) {
+    console.error('Signup action error:', error);
+    
     if (error instanceof z.ZodError) {
       return {
         error: error.errors[0]?.message || 'Invalid input',
       };
+    }
+
+    // Handle redirect errors (these are expected)
+    if (error && typeof error === 'object' && 'digest' in error) {
+      throw error;
     }
 
     return {

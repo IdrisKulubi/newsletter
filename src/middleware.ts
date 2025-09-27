@@ -17,7 +17,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/auth') ||
     pathname.startsWith('/static') ||
     pathname.includes('.') ||
-    pathname.startsWith('/favicon')
+    pathname.startsWith('/favicon') ||
+    pathname.startsWith('/auth') // Skip auth pages from middleware processing
   ) {
     return securityResponse;
   }
@@ -118,19 +119,13 @@ export async function middleware(request: NextRequest) {
   // Add client IP for logging and security
   response.headers.set('x-client-ip', clientIP);
 
-  // Protect authenticated routes
-  const isAuthRoute = pathname.startsWith('/auth');
-  const isProtectedRoute = !isAuthRoute && pathname !== '/';
+  // Protect authenticated routes (but not auth routes since we skip them above)
+  const isProtectedRoute = pathname !== '/';
   
   if (isProtectedRoute && !session?.user) {
     const loginUrl = new URL('/auth/signin', request.url);
     loginUrl.searchParams.set('callbackUrl', request.url);
     return NextResponse.redirect(loginUrl);
-  }
-
-  // Redirect authenticated users away from auth pages
-  if (isAuthRoute && session?.user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return response;
