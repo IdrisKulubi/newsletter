@@ -1,4 +1,4 @@
-import { getTenantContext as getDbTenantContext } from "@/lib/db/tenant-context";
+import { getTenantContext as getDbTenantContext } from "@/lib/db/tenant-resolver";
 import { db } from "@/lib/db";
 import { tenants } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";

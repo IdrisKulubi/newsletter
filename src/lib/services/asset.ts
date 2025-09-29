@@ -1,7 +1,7 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { assets, type Asset, type NewAsset } from "@/lib/db/schema/assets";
-import { getTenantContext } from "@/lib/db/tenant-context";
+import { getTenantContext } from "@/lib/db/tenant-resolver";
 import { r2Storage } from "@/lib/storage";
 
 export interface AssetUploadOptions {

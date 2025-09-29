@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AssetService } from '@/lib/services/asset';
 import { db } from '@/lib/db';
 import { assets } from '@/lib/db/schema/assets';
-import { getTenantContext } from '@/lib/db/tenant-context';
+import { getTenantContext } from '@/lib/db/tenant-resolver';
 import { r2Storage } from '@/lib/storage';
 
 // Mock dependencies

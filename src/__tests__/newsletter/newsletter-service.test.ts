@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { NewsletterService } from '@/lib/services/newsletter';
 import { db } from '@/lib/db';
 import { newsletters } from '@/lib/db/schema/newsletters';
-import { getTenantContext } from '@/lib/db/tenant-context';
+import { getTenantContext } from '@/lib/db/tenant-resolver';
 
 // Mock dependencies
 vi.mock('@/lib/db', () => ({

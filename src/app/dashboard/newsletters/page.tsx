@@ -10,8 +10,6 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthProvider } from '@/contexts/auth-context';
 import { TenantProvider } from '@/contexts/tenant-context';
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
-
 async function NewsletterList() {
   const { newsletters, total } = await NewsletterService.list({
     limit: 20,
@@ -159,7 +157,6 @@ export default async function NewslettersPage() {
   return (
     <AuthProvider initialUser={session.user}>
       <TenantProvider>
-        <DashboardLayout user={session.user}>
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl font-bold">Newsletters</h1>
@@ -172,7 +169,6 @@ export default async function NewslettersPage() {
               <NewsletterList />
             </Suspense>
           </div>
-        </DashboardLayout>
       </TenantProvider>
     </AuthProvider>
   );

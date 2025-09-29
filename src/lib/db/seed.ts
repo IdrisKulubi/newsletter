@@ -114,7 +114,7 @@ async function seed() {
     const sampleUsers = [];
 
     for (const tenant of sampleTenants) {
-      await setTenantContext(tenant.id);
+      await setTenantContext(db, tenant.id);
 
       const tenantUsers = await db
         .insert(users)
@@ -141,7 +141,7 @@ async function seed() {
         .returning();
 
       sampleUsers.push(...tenantUsers);
-      await clearTenantContext();
+      await clearTenantContext(db);
     }
 
     console.log(`✅ Created ${sampleUsers.length} users`);
@@ -151,7 +151,7 @@ async function seed() {
     const sampleNewsletters = [];
 
     for (const tenant of sampleTenants) {
-      await setTenantContext(tenant.id);
+      await setTenantContext(db, tenant.id);
 
       const tenantUsers = sampleUsers.filter((u) => u.tenantId === tenant.id);
       const editor = tenantUsers.find((u) => u.role === "editor");
@@ -217,7 +217,7 @@ async function seed() {
         sampleNewsletters.push(...tenantNewsletters);
       }
 
-      await clearTenantContext();
+      await clearTenantContext(db);
     }
 
     console.log(`✅ Created ${sampleNewsletters.length} newsletters`);
@@ -227,7 +227,7 @@ async function seed() {
     let totalCampaigns = 0;
 
     for (const tenant of sampleTenants) {
-      await setTenantContext(tenant.id);
+      await setTenantContext(db, tenant.id);
 
       const tenantUsers = sampleUsers.filter((u) => u.tenantId === tenant.id);
       const tenantNewsletters = sampleNewsletters.filter(
@@ -277,7 +277,7 @@ async function seed() {
         }
       }
 
-      await clearTenantContext();
+      await clearTenantContext(db);
     }
 
     console.log(`✅ Created ${totalCampaigns} campaigns`);

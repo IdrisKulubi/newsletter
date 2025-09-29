@@ -3,7 +3,6 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthProvider } from '@/contexts/auth-context';
 import { TenantProvider } from '@/contexts/tenant-context';
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
 import { NewsletterEditorPage } from '@/components/newsletter/newsletter-editor-page';
 
 export default async function NewNewsletterPage() {
@@ -23,9 +22,7 @@ export default async function NewNewsletterPage() {
   return (
     <AuthProvider initialUser={session.user}>
       <TenantProvider>
-        <DashboardLayout user={session.user}>
           <NewsletterEditorPage />
-        </DashboardLayout>
       </TenantProvider>
     </AuthProvider>
   );

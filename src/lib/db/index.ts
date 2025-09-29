@@ -41,4 +41,5 @@ export * from "./schema/campaigns";
 export * from "./schema/analytics";
 export * from "./schema/assets";
 export * from "./tenant-context";
+export * from "./tenant-resolver";
 export * from "./utils";

@@ -71,7 +71,7 @@ export class TenantService {
    * Update tenant
    */
   async updateTenant(tenantId: string, data: UpdateTenantData): Promise<Tenant | null> {
-    return withTenantContext(tenantId, async () => {
+    return withTenantContext(db, tenantId, async () => {
       // If updating domain, validate uniqueness
       if (data.domain || data.customDomain) {
         await this.validateDomainUniqueness(data.domain, data.customDomain, tenantId);
@@ -94,7 +94,7 @@ export class TenantService {
    * Delete tenant (soft delete by setting isActive to false)
    */
   async deleteTenant(tenantId: string): Promise<boolean> {
-    return withTenantContext(tenantId, async () => {
+    return withTenantContext(db, tenantId, async () => {
       const [tenant] = await db
         .update(tenants)
         .set({

@@ -7,7 +7,6 @@ import { eq } from 'drizzle-orm';
 import { UserManagement } from '@/components/auth/user-management';
 import { AuthProvider } from '@/contexts/auth-context';
 import { TenantProvider } from '@/contexts/tenant-context';
-import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
 
 export default async function UsersPage() {
   const session = await auth.api.getSession({
@@ -39,9 +38,7 @@ export default async function UsersPage() {
   return (
     <AuthProvider initialUser={session.user}>
       <TenantProvider>
-        <DashboardLayout user={session.user}>
           <UserManagement users={tenantUsers} currentUserId={session.user.id} />
-        </DashboardLayout>
       </TenantProvider>
     </AuthProvider>
   );

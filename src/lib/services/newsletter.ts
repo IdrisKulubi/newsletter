@@ -1,7 +1,7 @@
 import { eq, and, desc, asc } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { newsletters, type Newsletter, type NewNewsletter, type UpdateNewsletter } from '@/lib/db/schema/newsletters';
-import { getTenantContext } from '@/lib/db/tenant-context';
+import { getTenantContext } from '@/lib/db/tenant-resolver';
 
 export interface NewsletterFilters {
   status?: 'draft' | 'review' | 'approved';
