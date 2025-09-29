@@ -45,7 +45,8 @@ if (!config.database.url) {
   process.exit(1);
 }
 
-if (config.app.nodeEnv !== 'production' && config.app.nodeEnv !== 'staging') {
+const nodeEnv = config.app.nodeEnv as string;
+if (nodeEnv !== 'production' && nodeEnv !== 'staging') {
   console.warn('⚠️  Running migrations in non-production environment');
 }
 

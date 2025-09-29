@@ -7,7 +7,7 @@ import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 
 async function getUser() {
   const session = await auth.api.getSession({
-    headers: headers(),
+    headers: await headers(),
   });
   
   if (!session) {

@@ -12,7 +12,7 @@ import { BillingSettings } from '@/components/settings/billing-settings';
 
 async function getUser() {
   const session = await auth.api.getSession({
-    headers: headers(),
+    headers: await headers(),
   });
   
   if (!session) {

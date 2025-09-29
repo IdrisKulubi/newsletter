@@ -11,7 +11,7 @@ import { config } from "@/lib/config";
 export async function POST(request: NextRequest) {
   try {
     // Verify webhook signature if configured
-    const headersList = headers();
+    const headersList = await headers();
     const signature = headersList.get("resend-signature");
     
     if (config.email.webhookSecret && signature) {

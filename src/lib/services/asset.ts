@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { assets, type Asset, type NewAsset } from "@/lib/db/schema/assets";
 import { getTenantContext } from "@/lib/db/tenant-resolver";
 import { r2Storage } from "@/lib/storage";
+import { validateFileType as validateFileTypeUtil } from "@/lib/utils/file-validation";
 
 export interface AssetUploadOptions {
   optimize?: boolean;
@@ -310,41 +311,8 @@ export class AssetService {
   /**
    * Validate file type for newsletter assets
    */
-  static validateFileType(file: File): {
-    isValid: boolean;
-    error?: string;
-  } {
-    const allowedTypes = [
-      "image/jpeg",
-      "image/jpg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "image/svg+xml",
-      "application/pdf",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      return {
-        isValid: false,
-        error: `File type ${
-          file.type
-        } is not allowed. Allowed types: ${allowedTypes.join(", ")}`,
-      };
-    }
-
-    // Check file size (5MB limit)
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-      return {
-        isValid: false,
-        error: `File size ${(file.size / 1024 / 1024).toFixed(
-          2
-        )}MB exceeds the 5MB limit`,
-      };
-    }
-
-    return { isValid: true };
+  static validateFileType(file: File) {
+    return validateFileTypeUtil(file);
   }
 }
 

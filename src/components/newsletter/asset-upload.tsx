@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AssetService } from '@/lib/services/asset';
+import { uploadAsset, listAssets } from '@/lib/actions/asset-actions';
+import { validateFileType } from '@/lib/utils/file-validation';
 
 interface AssetUploadProps {
   tenantId: string;
@@ -35,7 +36,7 @@ export function AssetUpload({
     if (!file) return;
 
     // Validate file
-    const validation = AssetService.validateFileType(file);
+    const validation = validateFileType(file);
     if (!validation.isValid) {
       setError(validation.error || 'Invalid file type');
       return;
@@ -51,7 +52,10 @@ export function AssetUpload({
         setProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      const asset = await AssetService.uploadAsset(file, category, {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const result = await uploadAsset(formData, category, {
         optimize: category === 'image',
         maxWidth: 1920,
         maxHeight: 1080,
@@ -61,8 +65,14 @@ export function AssetUpload({
       clearInterval(progressInterval);
       setProgress(100);
 
-      // Call the completion handler
-      onUploadComplete(asset.url, asset);
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      if (result.data) {
+        // Call the completion handler
+        onUploadComplete(result.data.url, result.data);
+      }
 
       // Reset after a short delay
       setTimeout(() => {
@@ -189,8 +199,10 @@ export function AssetGallery({
   const loadAssets = async () => {
     try {
       setLoading(true);
-      const result = await AssetService.list({ category, limit: 50 });
-      setAssets(result.assets);
+      const result = await listAssets({ category, limit: 50 });
+      if (result.success && result.data) {
+        setAssets(result.data.assets);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load assets');
     } finally {
